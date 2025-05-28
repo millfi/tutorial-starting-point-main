@@ -11,7 +11,18 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices)
 		},
 		.task = [=](daxa::TaskInterface ti)
 		{
-
+			auto data = std::array{
+				MyVertex{.position = {-0.8f, +0.3f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+				MyVertex{.position = {-0.4f, +0.3f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+				MyVertex{.position = {-0.4f, -0.3f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+				MyVertex{.position = {-0.8f, -0.3f, 0.0f}, .color = {1.0f, 1.0f, 0.0f}},
+			};
+			auto staging_buffer_id = ti.device.create_buffer({
+				.size = sizeof(data),
+				.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+				.name = "my staging buffer",
+			});
+			 
 		}
 	});
 	
