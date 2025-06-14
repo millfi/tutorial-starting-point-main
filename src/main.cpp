@@ -5,7 +5,7 @@
 #include <daxa/utils/task_graph.hpp>
 
 // GPUにメッシュを転送するタスク
-void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices)
+void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::array<MyVertex, 3> & data)
 {
 	tg.add_task({
 		.attachments = {
@@ -13,11 +13,6 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices)
 		},
 		.task = [=](daxa::TaskInterface ti)
 		{
-			auto data = std::array{
-				MyVertex{.position = {-0.8f, +0.3f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-				MyVertex{.position = {-0.4f, +0.3f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-				MyVertex{.position = {-0.4f, -0.3f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-			};
 			// 上の行のdataのためのバッファ
 			auto staging_buffer_id = ti.device.create_buffer({
 				.size = sizeof(data),
@@ -25,7 +20,7 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices)
 				.name = "my staging buffer",
 			});
 			ti.recorder.destroy_buffer_deferred(staging_buffer_id);
-			auto * buffer_ptr = ti.device.buffer_host_address_as<std::array<MyVertex, 3>>(staging_buffer_id).value();
+			auto * buffer_ptr = ti.device.buffer_host_address_as<std::array<MyVertex,3 >>(staging_buffer_id).value();
 			*buffer_ptr = data;
 			ti.recorder.copy_buffer_to_buffer({
 				.src_buffer = staging_buffer_id,
@@ -40,7 +35,7 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices)
 void draw_vertices_task(daxa::TaskGraph& tg, 
 std::shared_ptr<daxa::RasterPipeline> pipeline, 
 daxa::TaskBufferView vertices, 
-daxa::TaskImageView render_target)
+daxa::TaskImageView render_target, const std::array<MyVertex, 3>& data)
 {
 	tg.add_task({
 		.attachments = {
@@ -64,12 +59,13 @@ daxa::TaskImageView render_target)
 			render_recorder.push_constant(MyPushConstant{
 				.my_vertex_ptr = ti.device.device_address(ti.get(vertices).ids[0]).value(),
 			});
-			render_recorder.draw({.vertex_count = 3});
+			render_recorder.draw({.vertex_count = static_cast<u32>(data.size())});
 			ti.recorder = std::move(render_recorder).end_renderpass();
 		},
 		.name = "draw vertives",
 	});
 }
+
 int main(int argc, char const *argv[]){
 	auto window = AppWindow("Learn Daxa", 860, 600);
 
@@ -140,8 +136,14 @@ int main(int argc, char const *argv[]){
 	// loop_task_graphが使うバッファを登録
 	loop_task_graph.use_persistent_buffer(task_vertex_buffer);
 	loop_task_graph.use_persistent_image(task_swapchain_image);
+	
+	auto data = std::array{
+				MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+				MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+				MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+			};
 	// わからない
-	draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image);
+	draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image, data);
 	// わからない daxa::TaskGraphに登録したタスクを実行する定型文っぽい
 	loop_task_graph.submit({});
 	loop_task_graph.present({});
@@ -152,8 +154,9 @@ int main(int argc, char const *argv[]){
 		.name = "upload",
 	});
 
+	
 	upload_task_graph.use_persistent_buffer(task_vertex_buffer);
-	upload_vertex_data_task(upload_task_graph, task_vertex_buffer);
+	upload_vertex_data_task(upload_task_graph, task_vertex_buffer, data);
 
 	upload_task_graph.submit({});
 	upload_task_graph.complete({});
@@ -163,6 +166,7 @@ int main(int argc, char const *argv[]){
 		window.update();
 		if(window.swapchain_out_of_date){
 			swapchain.resize();
+
 			window.swapchain_out_of_date = false;
 		}
 		// 次のswapchainの画像を取得
