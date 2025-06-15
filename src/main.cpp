@@ -3,9 +3,10 @@
 
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
+#include <vector>
 
 // GPUにメッシュを転送するタスク
-void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::array<MyVertex, 3> & data)
+void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::vector<MyVertex>& data)
 {
 	tg.add_task({
 		.attachments = {
@@ -15,17 +16,17 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices,
 		{
 			// 上の行のdataのためのバッファ
 			auto staging_buffer_id = ti.device.create_buffer({
-				.size = sizeof(data),
+				.size = sizeof(MyVertex) * data.size(),
 				.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
 				.name = "my staging buffer",
 			});
 			ti.recorder.destroy_buffer_deferred(staging_buffer_id);
-			auto * buffer_ptr = ti.device.buffer_host_address_as<std::array<MyVertex,3 >>(staging_buffer_id).value();
-			*buffer_ptr = data;
+			auto * buffer_ptr = ti.device.buffer_host_address_as<MyVertex>(staging_buffer_id).value();
+			std::memcpy(buffer_ptr, data.data(), sizeof(MyVertex) * data.size());
 			ti.recorder.copy_buffer_to_buffer({
 				.src_buffer = staging_buffer_id,
 				.dst_buffer = ti.get(vertices).ids[0],
-				.size = sizeof(data),
+				.size = sizeof(MyVertex) * data.size(),
 			});
 		},
 		.name = "upload vertices",
@@ -35,7 +36,7 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices,
 void draw_vertices_task(daxa::TaskGraph& tg, 
 std::shared_ptr<daxa::RasterPipeline> pipeline, 
 daxa::TaskBufferView vertices, 
-daxa::TaskImageView render_target, const std::array<MyVertex, 3>& data)
+daxa::TaskImageView render_target, const std::vector<MyVertex>& data)
 {
 	tg.add_task({
 		.attachments = {
@@ -105,7 +106,10 @@ int main(int argc, char const *argv[]){
 			.source = daxa::ShaderFile{"main.glsl"}
 		},
 		.color_attachments = {{.format = swapchain.get_format()}},
-		.raster = {},
+		.raster = {
+			.polygon_mode = daxa::PolygonMode::LINE,  // ワイヤーフレーム表示
+			.face_culling = daxa::FaceCullFlagBits::NONE,  // カリングを無効化
+		},
 		.push_constant_size = sizeof(MyPushConstant),
 		.name = "my pipeline"
 	});
@@ -115,8 +119,26 @@ int main(int argc, char const *argv[]){
 	}
 	pipeline = result.value();
 
+	// 複数のポリゴンを定義（例：2つの三角形で四角形を作成）
+	std::vector<MyVertex> mesh_data = {
+		// 最初の三角形
+		MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+		MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {-0.5f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+		
+		// 2番目の三角形
+		MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {+0.5f, -0.5f, 0.0f}, .color = {1.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {-0.5f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+		
+		// 追加の三角形（中央に小さい三角形）
+		MyVertex{.position = {-0.2f, +0.2f, 0.0f}, .color = {1.0f, 0.0f, 1.0f}},
+		MyVertex{.position = {+0.2f, +0.2f, 0.0f}, .color = {0.0f, 1.0f, 1.0f}},
+		MyVertex{.position = {+0.0f, -0.2f, 0.0f}, .color = {1.0f, 1.0f, 1.0f}},
+	};
+	
 	auto buffer_id = device.create_buffer({
-		.size = sizeof(MyVertex) * 3,
+		.size = sizeof(MyVertex) * mesh_data.size(),
 		.name = "my vertex data"
 	});
 	auto task_swapchain_image = daxa::TaskImage{{
@@ -137,13 +159,8 @@ int main(int argc, char const *argv[]){
 	loop_task_graph.use_persistent_buffer(task_vertex_buffer);
 	loop_task_graph.use_persistent_image(task_swapchain_image);
 	
-	auto data = std::array{
-				MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-				MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-				MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-			};
 	// わからない
-	draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image, data);
+	draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image, mesh_data);
 	// わからない daxa::TaskGraphに登録したタスクを実行する定型文っぽい
 	loop_task_graph.submit({});
 	loop_task_graph.present({});
@@ -156,7 +173,7 @@ int main(int argc, char const *argv[]){
 
 	
 	upload_task_graph.use_persistent_buffer(task_vertex_buffer);
-	upload_vertex_data_task(upload_task_graph, task_vertex_buffer, data);
+	upload_vertex_data_task(upload_task_graph, task_vertex_buffer, mesh_data);
 
 	upload_task_graph.submit({});
 	upload_task_graph.complete({});
