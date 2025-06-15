@@ -57,8 +57,13 @@ daxa::TaskImageView render_target, const std::vector<MyVertex>& data)
 				.render_area = {.width = size.x, .height = size.y},
 			});
 			render_recorder.set_pipeline(*pipeline);
+			
+			// アスペクト比を計算 (width / height)
+			float aspect_ratio = static_cast<float>(size.x) / static_cast<float>(size.y);
+			
 			render_recorder.push_constant(MyPushConstant{
 				.my_vertex_ptr = ti.device.device_address(ti.get(vertices).ids[0]).value(),
+				.aspect_ratio = aspect_ratio,
 			});
 			render_recorder.draw({.vertex_count = static_cast<u32>(data.size())});
 			ti.recorder = std::move(render_recorder).end_renderpass();

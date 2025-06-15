@@ -17,7 +17,12 @@ layout(location = 0) out daxa_f32vec3 v_col;
 void main()
 {
     MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
-    gl_Position = daxa_f32vec4(vert.position, 1);
+    
+    // アスペクト比による補正を適用
+    daxa_f32vec3 corrected_position = vert.position;
+    corrected_position.x /= push.aspect_ratio;  // x座標をアスペクト比で割る
+    
+    gl_Position = daxa_f32vec4(corrected_position, 1);
     v_col = vert.color;
 }
 

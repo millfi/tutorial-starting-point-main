@@ -7,11 +7,11 @@
   },
   "configurePresets": [
     {
-      "name": "Debug",
-      "description": "Debug configuration",
+      "name": "Debug-Windows",
+      "description": "Debug configuration for Windows",
       "hidden": false,
       "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build/Debug",
+      "binaryDir": "${sourceDir}/build/Debug-Windows",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -22,26 +22,26 @@
       }
     },
     {
-      "name": "Release",
-      "description": "Release configuration",
+      "name": "Release-Windows",
+      "description": "Release configuration for Windows",
       "hidden": false,
       "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build/Release",
+      "binaryDir": "${sourceDir}/build/Release-Windows",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "Debug",
-      "description": "Debug configuration",
+      "name": "Debug-Linux",
+      "description": "Debug configuration for Linux",
       "hidden": false,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/Debug",
+      "binaryDir": "${sourceDir}/build/Debug-Linux",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -52,18 +52,18 @@
       }
     },
     {
-      "name": "Release",
-      "description": "Release configuration",
+      "name": "Release-Linux",
+      "description": "Release configuration for Linux",
       "hidden": false,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/Release",
+      "binaryDir": "${sourceDir}/build/Release-Linux",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ]

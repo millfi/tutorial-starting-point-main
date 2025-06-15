@@ -9,4 +9,5 @@ DAXA_DECL_BUFFER_PTR(MyVertex)
 struct MyPushConstant
 {
     daxa_BufferPtr(MyVertex) my_vertex_ptr;
+    daxa_f32 aspect_ratio;  // アスペクト比 (width / height)
 };
