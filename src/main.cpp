@@ -3,10 +3,10 @@
 
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
-#include <vector>
 
 // GPUにメッシュを転送するタスク
-void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::vector<MyVertex>& data)
+template<typename T>
+void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::vector<T> & data)
 {
 	tg.add_task({
 		.attachments = {
@@ -16,27 +16,28 @@ void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices,
 		{
 			// 上の行のdataのためのバッファ
 			auto staging_buffer_id = ti.device.create_buffer({
-				.size = sizeof(MyVertex) * data.size(),
+				.size = sizeof(T) * data.size(),
 				.allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
 				.name = "my staging buffer",
 			});
 			ti.recorder.destroy_buffer_deferred(staging_buffer_id);
-			auto * buffer_ptr = ti.device.buffer_host_address_as<MyVertex>(staging_buffer_id).value();
-			std::memcpy(buffer_ptr, data.data(), sizeof(MyVertex) * data.size());
+			auto * buffer_ptr = ti.device.buffer_host_address_as<std::vector<T>>(staging_buffer_id).value();
+			memcpy(buffer_ptr, data.data(), data.size() * sizeof(T));
 			ti.recorder.copy_buffer_to_buffer({
 				.src_buffer = staging_buffer_id,
 				.dst_buffer = ti.get(vertices).ids[0],
-				.size = sizeof(MyVertex) * data.size(),
+				.size = sizeof(T) * data.size(),
 			});
 		},
 		.name = "upload vertices",
 	});
 }
 // 実際に描画する関数
+template<typename T>
 void draw_vertices_task(daxa::TaskGraph& tg, 
 std::shared_ptr<daxa::RasterPipeline> pipeline, 
 daxa::TaskBufferView vertices, 
-daxa::TaskImageView render_target, const std::vector<MyVertex>& data)
+daxa::TaskImageView render_target, const std::vector<T>& data)
 {
 	tg.add_task({
 		.attachments = {
@@ -57,10 +58,9 @@ daxa::TaskImageView render_target, const std::vector<MyVertex>& data)
 				.render_area = {.width = size.x, .height = size.y},
 			});
 			render_recorder.set_pipeline(*pipeline);
-			
-			// アスペクト比を計算 (width / height)
+
 			float aspect_ratio = static_cast<float>(size.x) / static_cast<float>(size.y);
-			
+
 			render_recorder.push_constant(MyPushConstant{
 				.my_vertex_ptr = ti.device.device_address(ti.get(vertices).ids[0]).value(),
 				.aspect_ratio = aspect_ratio,
@@ -111,10 +111,7 @@ int main(int argc, char const *argv[]){
 			.source = daxa::ShaderFile{"main.glsl"}
 		},
 		.color_attachments = {{.format = swapchain.get_format()}},
-		.raster = {
-			.polygon_mode = daxa::PolygonMode::LINE,  // ワイヤーフレーム表示
-			.face_culling = daxa::FaceCullFlagBits::NONE,  // カリングを無効化
-		},
+		.raster = {},
 		.push_constant_size = sizeof(MyPushConstant),
 		.name = "my pipeline"
 	});
@@ -127,21 +124,20 @@ int main(int argc, char const *argv[]){
 	// 複数のポリゴンを定義（例：2つの三角形で四角形を作成）
 	std::vector<MyVertex> mesh_data = {
 		// 最初の三角形
-		MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-		MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-		MyVertex{.position = {-0.5f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+		MyVertex{.position = {-1.0f, +1.0f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+		MyVertex{.position = {+1.0f, +1.0f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {-1.0f, -1.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
 		
 		// 2番目の三角形
-		MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-		MyVertex{.position = {+0.5f, -0.5f, 0.0f}, .color = {1.0f, 1.0f, 0.0f}},
-		MyVertex{.position = {-0.5f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+		MyVertex{.position = {+1.0f, +1.0f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {+1.0f, -1.0f, 0.0f}, .color = {1.0f, 1.0f, 0.0f}},
+		MyVertex{.position = {-1.0f, -1.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
 		
 		// 追加の三角形（中央に小さい三角形）
 		MyVertex{.position = {-0.2f, +0.2f, 0.0f}, .color = {1.0f, 0.0f, 1.0f}},
 		MyVertex{.position = {+0.2f, +0.2f, 0.0f}, .color = {0.0f, 1.0f, 1.0f}},
 		MyVertex{.position = {+0.0f, -0.2f, 0.0f}, .color = {1.0f, 1.0f, 1.0f}},
 	};
-	
 	auto buffer_id = device.create_buffer({
 		.size = sizeof(MyVertex) * mesh_data.size(),
 		.name = "my vertex data"
@@ -163,6 +159,7 @@ int main(int argc, char const *argv[]){
 	// loop_task_graphが使うバッファを登録
 	loop_task_graph.use_persistent_buffer(task_vertex_buffer);
 	loop_task_graph.use_persistent_image(task_swapchain_image);
+	
 	
 	// わからない
 	draw_vertices_task(loop_task_graph, pipeline, task_vertex_buffer, task_swapchain_image, mesh_data);
