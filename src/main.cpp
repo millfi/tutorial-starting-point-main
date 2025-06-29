@@ -1,8 +1,16 @@
 #include "window.hpp"
 #include "shaders/shared.inl"
+#include "camera.hpp"
 
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/task_graph.hpp>
+
+// GLMライブラリのインクルード
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include <iostream>
 
 // GPUにメッシュを転送するタスク
 template<typename T>
@@ -52,6 +60,7 @@ daxa::TaskImageView render_target, const std::vector<T>& data)
 					daxa::RenderAttachmentInfo{
 						.image_view = ti.get(render_target).view_ids[0],
 						.load_op = daxa::AttachmentLoadOp::CLEAR,
+						// 背景カラー
 						.clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
 					},
 				},
@@ -73,6 +82,17 @@ daxa::TaskImageView render_target, const std::vector<T>& data)
 }
 
 int main(int argc, char const *argv[]){
+	// GLMのテスト - ベクトルと行列の基本的な操作
+	glm::vec3 test_position(1.0f, 2.0f, 3.0f);
+	glm::mat4 test_matrix = glm::translate(glm::mat4(1.0f), test_position);
+	glm::vec4 test_vec4 = test_matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	
+	// GLMが正しく動作していることを確認
+	std::cout << "GLM Test - Translated position: (" 
+	          << test_vec4.x << ", " 
+	          << test_vec4.y << ", " 
+	          << test_vec4.z << ")" << std::endl;
+
 	auto window = AppWindow("Learn Daxa", 860, 600);
 
 	daxa::Instance instance = daxa::create_instance({});

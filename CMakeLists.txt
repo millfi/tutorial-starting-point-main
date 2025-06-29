@@ -25,5 +25,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC include)
 find_package(glfw3 CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
+
 find_package(daxa CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE daxa::daxa)
