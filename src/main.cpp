@@ -10,8 +10,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+// debug
 #include <iostream>
-
+#include <string>
+using namespace std::string_literals;
 // GPUにメッシュを転送するタスク
 template<typename T>
 void upload_vertex_data_task(daxa::TaskGraph& tg, daxa::TaskBufferView vertices, const std::vector<T> & data)
@@ -92,6 +94,73 @@ int main(int argc, char const *argv[]){
 	          << test_vec4.x << ", " 
 	          << test_vec4.y << ", " 
 	          << test_vec4.z << ")" << std::endl;
+
+	// =============================================================================
+	// カメラシステムのテスト
+	// =============================================================================
+	
+	std::cout << "\n=== Camera System Tests ===" << std::endl;
+	
+	// アプローチ2: 関数型実装のテスト
+	std::cout << "\n--- Functional Approach Test ---" << std::endl;
+	
+	// 初期状態
+	CameraState initial_state;
+	initial_state.position = glm::vec3(0.0f, 0.0f, 5.0f);
+	initial_state = update_camera_vectors(initial_state);
+	
+	std::wcout << L"Initial functional camera position: ("
+	          << initial_state.position.x << L", " 
+	          << initial_state.position.y << L", " 
+	          << initial_state.position.z << L")" << std::endl;
+	
+	// 複数の変換を合成
+	auto combined_transform = compose_transforms<CameraState>({
+		fps_transforms::move_forward(2.0f),
+		fps_transforms::move_right(1.0f),
+		fps_transforms::rotate(45.0f, 30.0f)
+	});
+	
+	auto transformed_state = combined_transform(initial_state);
+	std::wcout << L"After combined transforms: position=(" 
+	          << transformed_state.position.x << L", " 
+	          << transformed_state.position.y << L", " 
+	          << transformed_state.position.z << L"), yaw=" 
+	          << transformed_state.yaw << L"°, pitch=" 
+	          << transformed_state.pitch << L"°" << std::endl;
+	
+	// 軌道カメラの関数型テスト
+	OrbitCameraState orbit_state;
+	orbit_state.radius = 10.0f;
+	orbit_state.elevation = 30.0f;
+	
+	auto orbit_combined = compose_transforms<OrbitCameraState>({
+		orbit_transforms::orbit_horizontal(45.0f),
+		orbit_transforms::orbit_vertical(15.0f),
+		orbit_transforms::zoom_in(3.0f)
+	});
+	
+	auto transformed_orbit = orbit_combined(orbit_state);
+	auto final_orbit_pos = get_orbit_position(transformed_orbit);
+	std::cout << "Functional orbit camera after transforms: position=(" 
+	          << final_orbit_pos.x << ", " 
+	          << final_orbit_pos.y << ", " 
+	          << final_orbit_pos.z << "), radius=" 
+	          << transformed_orbit.radius << std::endl;
+	
+	// 行列計算テスト
+	std::cout << "\n--- Matrix Calculation Test ---" << std::endl;
+	
+	auto view_calc = matrix_calculators::view_matrix();
+	auto proj_calc = matrix_calculators::projection_matrix();
+	
+	glm::mat4 view_matrix = view_calc(transformed_state);
+	glm::mat4 proj_matrix = proj_calc(transformed_state);
+	
+	std::cout << "View matrix calculated successfully" << std::endl;
+	std::cout << "Projection matrix calculated successfully" << std::endl;
+	
+	std::cout << "=== Camera System Tests Complete ===" << std::endl;
 
 	auto window = AppWindow("Learn Daxa", 860, 600);
 
